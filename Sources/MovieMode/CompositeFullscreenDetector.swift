@@ -9,6 +9,9 @@ final class CompositeFullscreenDetector: FullscreenPlaybackDetecting {
     private var scheduler: FullscreenScanScheduler?
     private var workspaceObserver: NSObjectProtocol?
     private var activeSession: (displayID: String, bundleIdentifier: String)?
+    private var consecutiveMissCount = 0
+    /// Require several missed scans before exiting — avoids flicker when Chrome fullscreen is briefly undetectable.
+    private let exitMissThreshold = 3
     private let settingsStore: MovieModeSettingsStore
 
     init(settingsStore: MovieModeSettingsStore) {
@@ -58,6 +61,7 @@ final class CompositeFullscreenDetector: FullscreenPlaybackDetecting {
 
     func resetTracking() {
         activeSession = nil
+        consecutiveMissCount = 0
     }
 
     func scanNow() {
@@ -71,10 +75,22 @@ final class CompositeFullscreenDetector: FullscreenPlaybackDetecting {
 
     private func scan() {
         if let match = findFullscreenMatch() {
+            consecutiveMissCount = 0
             applyMatch(match)
-        } else {
-            emitExitedIfNeeded()
+            return
         }
+
+        guard activeSession != nil else {
+            return
+        }
+
+        consecutiveMissCount += 1
+        guard consecutiveMissCount >= exitMissThreshold else {
+            return
+        }
+
+        consecutiveMissCount = 0
+        emitExitedIfNeeded()
     }
 
     private func findFullscreenMatch() -> (displayID: String, bundleIdentifier: String)? {
