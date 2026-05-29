@@ -20,4 +20,8 @@ public protocol FullscreenPlaybackDetecting: AnyObject {
     var onEvent: ((FullscreenPlaybackEvent) -> Void)? { get set }
     func start()
     func stop()
+    /// Clears internal fullscreen tracking without emitting an exit event.
+    func resetTracking()
+    /// Runs an immediate scan (for wake/display changes).
+    func scanNow()
 }

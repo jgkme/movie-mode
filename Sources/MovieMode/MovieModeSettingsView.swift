@@ -59,7 +59,7 @@ struct MovieModeSettingsView: View {
         GroupBox("Detection") {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Use Accessibility for browser detection", isOn: accessibilityBinding)
-                Text("Improves YouTube and other browser fullscreen detection. macOS will ask for Accessibility permission for MovieMode.")
+                Text("Recommended for YouTube and other browsers. Uses window heuristics when off; when on, also reads browser fullscreen state (requires Accessibility permission).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

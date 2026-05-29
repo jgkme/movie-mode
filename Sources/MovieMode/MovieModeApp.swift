@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
     private var screenObserver: NSObjectProtocol?
+    private var workspaceObservers: [NSObjectProtocol] = []
 
     override init() {
         let persisted = UserDefaultsMovieModeSettingsStore()
@@ -47,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
         observeScreenChanges()
+        observeWorkspaceEvents()
         configureSettings()
         configureDetector()
         updateStatusItem()
@@ -59,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
         }
+
+        for observer in workspaceObservers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        workspaceObservers.removeAll()
     }
 
     private func configureSettings() {
@@ -110,8 +117,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor [weak self] in
                 self?.settingsStore.refreshDisplays()
                 self?.coordinator.handleDisplayConfigurationChanged()
+                self?.fullscreenDetector.resync()
                 self?.updateStatusItem()
             }
+        }
+    }
+
+    private func observeWorkspaceEvents() {
+        let wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.settingsStore.settings.autoMovieModeEnabled else {
+                    return
+                }
+
+                self.fullscreenDetector.resync()
+            }
+        }
+        workspaceObservers.append(wakeObserver)
+
+        let sessionObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.settingsStore.settings.autoMovieModeEnabled else {
+                    return
+                }
+
+                self.fullscreenDetector.resync()
+            }
+        }
+        workspaceObservers.append(sessionObserver)
+    }
+
+    private func syncDetectorAfterMovieModeChange() {
+        if shieldController.isMovieModeActive {
+            return
+        }
+
+        fullscreenDetector.resetTracking()
+        if settingsStore.settings.autoMovieModeEnabled {
+            fullscreenDetector.scanNow()
         }
     }
 
@@ -122,6 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         coordinator.toggleManualMovieModePreservingAutoIfActive()
+        syncDetectorAfterMovieModeChange()
         updateStatusItem()
     }
 

@@ -31,6 +31,21 @@ enum ScreenIdentity {
         return bestMatch
     }
 
+    static func appKitFrame(fromTopLeftGlobalFrame frame: CGRect) -> CGRect {
+        // CGWindow and Accessibility use a top-left origin; AppKit screen frames use bottom-left.
+        let desktopMaxY = NSScreen.screens.map(\.frame.maxY).max() ?? frame.maxY
+        return CGRect(
+            x: frame.origin.x,
+            y: desktopMaxY - frame.origin.y - frame.height,
+            width: frame.width,
+            height: frame.height
+        )
+    }
+
+    static func appKitFrame(fromAccessibilityFrame axFrame: CGRect) -> CGRect {
+        appKitFrame(fromTopLeftGlobalFrame: axFrame)
+    }
+
     static func isWindowApproximatelyFullscreen(windowBounds: CGRect, on screen: NSScreen, tolerance: CGFloat = 4) -> Bool {
         let screenFrame = screen.frame
         return abs(windowBounds.origin.x - screenFrame.origin.x) <= tolerance
